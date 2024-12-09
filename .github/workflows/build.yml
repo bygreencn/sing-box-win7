@@ -22,6 +22,7 @@ on:
           - Binary
           - Android
           - Apple
+          - app-store
           - iOS
           - macOS
           - tvOS
@@ -32,7 +33,7 @@ on:
       - dev-next
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}-${{ inputs.build }}
   cancel-in-progress: true
 
 jobs:
@@ -283,7 +284,7 @@ jobs:
           path: 'dist'
   build_apple_library:
     name: Build Apple library
-    if: github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Apple' || inputs.build == 'iOS' || inputs.build == 'macOS' || inputs.build == 'tvOS' || inputs.build == 'macOS-standalone'
+    if: github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Apple' || inputs.build == 'app-store' || inputs.build == 'iOS' || inputs.build == 'macOS' || inputs.build == 'tvOS' || inputs.build == 'macOS-standalone'
     runs-on: macos-15
     needs:
       - calculate_version
@@ -323,19 +324,19 @@ jobs:
       matrix:
         include:
           - name: iOS
-            if: ${{ github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Apple' || inputs.build == 'iOS' }}
+            if: ${{ github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Apple' || inputs.build == 'app-store'|| inputs.build == 'iOS' }}
             scheme: SFI
             destination: 'generic/platform=iOS'
             archive: build/SFI.xcarchive
             upload: SFI/Upload.plist
           - name: macOS
-            if: ${{ github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Apple' || inputs.build == 'macOS' }}
+            if: ${{ github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Apple' || inputs.build == 'app-store'|| inputs.build == 'macOS' }}
             scheme: SFM
             destination: 'generic/platform=macOS'
             archive: build/SFM.xcarchive
             upload: SFI/Upload.plist
           - name: tvOS
-            if: ${{ github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Apple' || inputs.build == 'tvOS' }}
+            if: ${{ github.event_name != 'workflow_dispatch' || inputs.build == 'All' || inputs.build == 'Apple' || inputs.build == 'app-store'|| inputs.build == 'tvOS' }}
             scheme: SFT
             destination: 'generic/platform=tvOS'
             archive: build/SFT.xcarchive
@@ -463,10 +464,14 @@ jobs:
           		--app-drop-link 0 0 \
           		--skip-jenkins \
           	SFM.dmg "${{ matrix.export_path }}/SFM.app"
-          xcrun notarytool submit "SFM.dmg" --wait --keychain-profile "notarytool-password"
+          xcrun notarytool submit "SFM.dmg" --wait --keychain-profile "notarytool-password"          
+          cd "${{ matrix.archive }}"
+          zip -r SFM.dSYMs.zip dSYMs
           popd
+          
           mkdir -p dist/release
           cp clients/apple/SFM.dmg "dist/release/SFM-${VERSION}-universal.dmg"
+          cp "${{ matrix.archive }}/SFM.dSYMs.zip" "dist/release/SFM-${VERSION}-universal.dSYMs.zip"
       - name: Upload image
         if: matrix.if && matrix.name == 'macOS-standalone' && github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
